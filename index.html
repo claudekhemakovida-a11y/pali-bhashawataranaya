@@ -362,6 +362,13 @@ h1 .pen{margin-right:4px}
 .qset .ql{font-weight:700;margin:12px 0 6px}.qset .ql:first-child{margin-top:0}
 .qsel{width:100%;font:inherit;color:inherit;background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px}
 .nv .ca .tbl{margin:4px 0}
+.card.les{font-size:1.08rem;line-height:1.85;color:var(--ink);padding:18px 18px 18px 30px}
+.card.les p{margin:8px 0}
+.card.les p.b{font-weight:700;color:var(--ink)}
+.card.les .lh{font-size:1.2rem;margin:26px 0 10px}
+.card.les .lh:first-child{margin-top:4px}
+.decl2.nohead tbody tr:first-child td{border-top:0}
+.decl2 td div{line-height:1.7}
 .dh{font-size:1.12rem;color:var(--acc);margin:22px 0 10px;padding-bottom:6px;border-bottom:1.5px solid var(--line);font-weight:700}
 .decl-wrap{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;overflow-x:auto;margin:8px 0 16px;max-width:100%}
 table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
@@ -527,7 +534,20 @@ table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
     return h("div", { class: "decl-wrap" }, tb);
   }
 
-  function renderBlock(b) {
+  function renderPlain(rows, hdr) {
+    const tb = h("table", { class: "decl2" + (hdr ? "" : " nohead") });
+    let body = rows;
+    if (hdr) { tb.append(h("thead", {}, h("tr", {}, rows[0].map((c) => h("th", { scope: "col" }, norm(cellTxt(c))))))); body = rows.slice(1); }
+    const tbody = h("tbody");
+    body.forEach((r) => {
+      const tr = h("tr");
+      r.forEach((c) => { const td = h("td"); (Array.isArray(c) ? c : [c]).forEach((t) => td.append(h("div", {}, t))); tr.append(td); });
+      tbody.append(tr);
+    });
+    tb.append(tbody);
+    return h("div", { class: "decl-wrap" }, tb);
+  }
+  function renderBlock(b, inLesson) {
     switch (b[0]) {
       case "p": return b[3] === "dh" ? h("h4", { class: "dh" }, b[1].replace(/[:\-–]+\s*$/, "").trim()) : h("p", { class: b[2] ? "b" : null }, b[1]);
       case "h3": return h("h4", { class: "lh" }, b[1]);
@@ -537,6 +557,7 @@ table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
       case "i": return h("img", { src: b[1], alt: "පොතේ රූප සටහන", loading: "lazy", style: `aspect-ratio:${1 / b[2]};width:100%` });
       case "t": {
         if (isDecl(b[1])) return renderDecl(b[1]);
+        if (inLesson) return renderPlain(b[1], b[2]);
         const rows = b[1], hdr = b[2], tb = h("table");
         rows.forEach((r, i) => {
           const tr = h("tr");
@@ -606,6 +627,7 @@ table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
     }
     for (let bi = 0; bi < blocks.length; bi++) {
       const b = blocks[bi];
+      if (b[0] === "p" && b[2] && /^\s*\d+\s*\.\s*\S/.test(b[1]) && b[1].length <= 110) { blocks[bi] = ["p", b[1], 1, "dh"]; continue; }
       if (b[0] !== "p" || !/ශබ්ද/.test(b[1]) || b[1].length > 90) continue;
       let j = bi + 1; while (j < blocks.length && j <= bi + 3 && (blocks[j][0] === "s" || (blocks[j][0] === "t" && !isDecl(blocks[j][1]) && blocks[j][1].length <= 1))) j++;
       if (j < blocks.length && blocks[j][0] === "t" && isDecl(blocks[j][1])) blocks[bi] = ["p", b[1], b[2] || 0, "dh"];
@@ -623,7 +645,7 @@ table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
         prevI >= 0 ? h("button", { class: "btn g sm", onclick: () => les(prevI) }, "◀ පෙර පාඩම") : null,
         sets.length ? h("button", { class: "btn sm", onclick: () => exRun(sets[0]) }, pen(), " " + label(ci)) : null,
         nextI >= 0 ? h("button", { class: "btn g sm", onclick: () => les(nextI) }, "ඊළඟ පාඩම ▶") : null));
-    const rb = (b) => (b[0] === "__h" ? h("h3", { class: "lh", id: "sec" + b[2] }, b[1]) : renderBlock(b));
+    const rb = (b) => (b[0] === "__h" ? h("h3", { class: "lh", id: "sec" + b[2] }, b[1]) : renderBlock(b, true));
     const STEP = 120; let i = 0;
     const sentinel = h("p", { class: "sub", style: "text-align:center" }, "තවත් පෙන්වමින්…");
     const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { io.disconnect(); chunk(); } }, { rootMargin: "900px" });
