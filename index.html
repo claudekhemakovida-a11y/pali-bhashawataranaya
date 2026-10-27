@@ -362,6 +362,16 @@ h1 .pen{margin-right:4px}
 .qset .ql{font-weight:700;margin:12px 0 6px}.qset .ql:first-child{margin-top:0}
 .qsel{width:100%;font:inherit;color:inherit;background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:8px 10px}
 .nv .ca .tbl{margin:4px 0}
+.dh{font-size:1.12rem;color:var(--acc);margin:22px 0 10px;padding-bottom:6px;border-bottom:1.5px solid var(--line);font-weight:700}
+.decl-wrap{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;overflow-x:auto;margin:8px 0 16px;max-width:100%}
+table.decl2{display:table;width:100%;border-collapse:collapse;border:0;margin:0}
+.decl2 th{background:linear-gradient(var(--b1),var(--b2));color:#fff3d6;text-align:left;padding:9px 14px;border:0;font-weight:700}
+.decl2 td{padding:8px 14px;border:0;border-top:1px solid color-mix(in srgb,var(--line) 55%,transparent);vertical-align:top;background:transparent}
+.decl2 th+th,.decl2 td+td{border-left:1px dashed color-mix(in srgb,var(--gold) 55%,transparent)}
+.decl2 tbody tr:nth-child(even){background:color-mix(in srgb,var(--gold) 9%,transparent)}
+.decl2 tbody tr:hover{background:color-mix(in srgb,var(--gold) 15%,transparent)}
+.decl2 .ck{font-weight:700;color:var(--acc2)}
+.decl2 .cm{color:var(--mut)}
 </style>
 </head>
 <body>
@@ -460,15 +470,73 @@ h1 .pen{margin-right:4px}
   $("tcb").addEventListener("click", tt);
 
   // ---------- content blocks ----------
+  // ---------- declension tables, drawn like Book II (abbreviation before the singular form) ----------
+  const CASES = { "පඨමා": "ප", "ආලපන": "ආ", "දුතියා": "දු", "තතියා": "ත", "කරණ": "ක", "චතුත්ථි": "ච", "චතුත්ථී": "ච", "පඤ්චමී": "පං", "පඤ්චමි": "පං", "ඡට්ඨි": "ඡ", "ඡට්ඨී": "ඡ", "සත්තමී": "ස", "සත්තමි": "ස", "තතියා කරණ": "ත.ක" };
+  const ABBR = { "ප": "ප", "අ": "ආ", "ආ": "ආ", "දු": "දු", "ත": "ත", "ක": "ක", "ච": "ච", "පං": "පං", "ඡ": "ඡ", "ස": "ස" };
+  const cellTxt = (c) => (Array.isArray(c) ? c.join(" ") : String(c || "")).trim();
+  const caseKey = (x) => cellTxt(x).replace(/\u200d/g, "").replace(/^\d+\.\s*/, "").replace(/\s*විභ[ත්ක]ති(ය)?\s*=?$/, "").replace(/[:.]\s*$/, "").trim();
+  function caseAbbr(x, seenCha) {
+    const k = caseKey(x);
+    if (CASES[k]) return CASES[k];
+    if (ABBR[k]) return k === "ප" && seenCha ? "පං" : ABBR[k];
+    return null;
+  }
+  function isDecl(rows) {
+    if (!rows || rows.length < 6) return false;
+    let n = 0, cha = false;
+    rows.forEach((r) => { const a = caseAbbr(r[0], cha); if (a) { n++; if (a === "ච") cha = true; } });
+    return n >= 5;
+  }
+  const norm = (t) => t.replace(/එ්ක\s*වචන/, "ඒකවචන").replace(/බහු\s*වචන/, "බහුවචන").replace(/එ්/g, "ඒ");
+  function renderDecl(rows) {
+    let head = null, body = rows;
+    if (!caseAbbr(rows[0][0], false) && cellTxt(rows[0][0]) !== "" || /වචන/.test(rows[0].map(cellTxt).join(" "))) {
+      if (!caseAbbr(rows[0][0], false)) { head = rows[0]; body = rows.slice(1); }
+    }
+    const nc = Math.max(...body.map((r) => r.length));
+    const valCols = nc >= 3 ? [nc - 2, nc - 1] : [nc - 1];
+    let hcells = valCols.length === 2 ? ["ඒකවචන", "බහුවචන"] : ["වරනැගීම"];
+    if (head) { const ht = valCols.map((i) => norm(cellTxt(head[i]))); if (ht.every(Boolean)) hcells = ht; }
+    const tb = h("table", { class: "decl2" }, h("thead", {}, h("tr", {}, hcells.map((t) => h("th", { scope: "col" }, t)))));
+    body = body.map((r) => r.slice());
+    valCols.forEach((ci) => {
+      const cells = body.map((r) => (Array.isArray(r[ci]) ? r[ci] : [r[ci] || ""]).filter((t) => String(t).trim()));
+      const lines = cells.flat();
+      if (cells.some((c) => c.length === 0) && cells.some((c) => c.length > 1) && lines.length === body.length) body.forEach((r, k) => { r[ci] = [lines[k]]; });
+    });
+    const tbody = h("tbody"); let cha = false;
+    body.forEach((r) => {
+      const a = caseAbbr(r[0], cha); if (a === "ච") cha = true;
+      const mid = r.slice(1, valCols[0]).map(cellTxt).filter(Boolean).join(" ");
+      const tr = h("tr");
+      valCols.forEach((ci, j) => {
+        const td = h("td");
+        const lines = Array.isArray(r[ci]) ? r[ci] : [r[ci] || ""];
+        lines.forEach((t, li) => {
+          const d = h("div");
+          if (j === 0 && li === 0 && a) d.append(h("span", { class: "ck" }, a + ". "));
+          if (j === 0 && li === 0 && mid) d.append(h("span", { class: "cm" }, "(" + mid + ") "));
+          d.append(t);
+          td.append(d);
+        });
+        tr.append(td);
+      });
+      tbody.append(tr);
+    });
+    tb.append(tbody);
+    return h("div", { class: "decl-wrap" }, tb);
+  }
+
   function renderBlock(b) {
     switch (b[0]) {
-      case "p": return h("p", { class: b[2] ? "b" : null }, b[1]);
+      case "p": return b[3] === "dh" ? h("h4", { class: "dh" }, b[1].replace(/[:\-–]+\s*$/, "").trim()) : h("p", { class: b[2] ? "b" : null }, b[1]);
       case "h3": return h("h4", { class: "lh" }, b[1]);
       case "d": return h("div", { class: "orn" }, "🪷 " + b[1] + " 🪷");
       case "n": return h("p", { class: "note" }, b[1]);
       case "s": return h("div", { class: "gap", "aria-hidden": "true" });
       case "i": return h("img", { src: b[1], alt: "පොතේ රූප සටහන", loading: "lazy", style: `aspect-ratio:${1 / b[2]};width:100%` });
       case "t": {
+        if (isDecl(b[1])) return renderDecl(b[1]);
         const rows = b[1], hdr = b[2], tb = h("table");
         rows.forEach((r, i) => {
           const tr = h("tr");
@@ -510,6 +578,38 @@ h1 .pen{margin-right:4px}
     ttl(`පාඩම ${ci + 1} / ${D.chapters.length}`);
     const blocks = [], anchors = [];
     c.secs.forEach((s, k) => { if (s.t) { anchors.push([k, s.t, blocks.length]); blocks.push(["__h", s.t, k]); } blocks.push(...s.b); });
+    // a 2-column declension table whose singular forms sit as separate lines right after it: join them back
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const b = blocks[bi];
+      if (b[0] !== "t" || !isDecl(b[1]) || Math.max(...b[1].map((r) => r.length)) !== 2) continue;
+      const rows = b[1].filter((r) => caseAbbr(r[0], true) || cellTxt(r[0]) === "" );
+      const take = []; let j = bi + 1;
+      while (j < blocks.length && take.length < rows.length) {
+        const x = blocks[j];
+        if (x[0] === "s") { j++; continue; }
+        if (x[0] !== "p" || x[1].length > 80 || /ශබ්ද|:-\s*$/.test(x[1])) break;
+        if (/^\([^()]*\)\.?$/.test(x[1].trim()) && take.length) { take[take.length - 1].push(j); j++; continue; }
+        take.push([j]); j++;
+      }
+      if (take.length !== rows.length) continue;
+      const merged = [[["විභත්ති"], ["ඒකවචන"], ["බහුවචන"]]].concat(rows.map((r, k) => [r[0], [take[k].map((q) => blocks[q][1]).join(" ")], r[1]]));
+      blocks[bi] = ["t", merged, 1];
+      take.flat().sort((a, z) => z - a).forEach((k) => blocks.splice(k, 1));
+    }
+    // a separate "විභත්ති ඒකවචන බහුවචන" line just before a declension table repeats the table header
+    for (let bi = blocks.length - 1; bi >= 0; bi--) {
+      const b = blocks[bi];
+      const txt = b[0] === "p" ? b[1] : b[0] === "t" && b[1].length === 1 ? b[1][0].map(cellTxt).join(" ") : null;
+      if (!txt || !/වචන.*වචන/.test(txt) || txt.length > 60) continue;
+      let j = bi + 1; while (j < blocks.length && blocks[j][0] === "s") j++;
+      if (j < blocks.length && blocks[j][0] === "t" && isDecl(blocks[j][1])) blocks.splice(bi, 1);
+    }
+    for (let bi = 0; bi < blocks.length; bi++) {
+      const b = blocks[bi];
+      if (b[0] !== "p" || !/ශබ්ද/.test(b[1]) || b[1].length > 90) continue;
+      let j = bi + 1; while (j < blocks.length && j <= bi + 3 && (blocks[j][0] === "s" || (blocks[j][0] === "t" && !isDecl(blocks[j][1]) && blocks[j][1].length <= 1))) j++;
+      if (j < blocks.length && blocks[j][0] === "t" && isDecl(blocks[j][1])) blocks[bi] = ["p", b[1], b[2] || 0, "dh"];
+    }
     const body = h("div", { class: "card les" });
     const prevI = (() => { for (let i = ci - 1; i >= 0; i--) if (hasLesson(i)) return i; return -1; })();
     const nextI = (() => { for (let i = ci + 1; i < D.chapters.length; i++) if (hasLesson(i)) return i; return -1; })();
